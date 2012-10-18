@@ -28,6 +28,8 @@ usage: main [-h|--help] [options] <command> [<args>]
 
   options:
     -h, --help         print this message and exit
+    -o, --openstack    source ~/.ec2-novarc (default)
+    -e, --eucalyptus   source ~/.ec2-eucarc
 
 """
 
@@ -39,9 +41,34 @@ def _argparse():
 	p.print_usage  = lambda fd=sys.stdout : fd.write(USAGE)
 	p.format_help  = lambda : S3_USAGE
 	p.format_usage = lambda : S3_USAGE
+	
+	p.add_argument("-o", "--openstack", dest="rc",
+		action="store_const", const="~/.ec2-novarc", default="~/.ec2-novarc")
+	p.add_argument("-e", "--eucalyptus", dest="rc",
+		action="store_const", const="~/.ec2-eucarc")
 
 	args = p.parse_args()
 	return args
+
+
+def _source_env(filename=None):
+
+	if filename is None:
+		return
+
+	cmd = ["sh", "-c", "source %s && env" % filename]
+	prc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+
+	for line in prc.stdout:
+
+		if line[-1] == '\n':
+			line = line[:-1]
+
+		key, _, val = line.partition("=")
+
+		os.environ[key] = val
+
+	prc.communicate()
 
 
 def _parse_url(url):
@@ -83,5 +110,8 @@ def _cxn_from_env():
 if __name__ == "__main__":
 
 	args = _argparse()
+	
+	if args.rc:
+		_source_env(args.rc)
 
 	cxn = _cxn_from_env()
