@@ -41,11 +41,13 @@ def _argparse():
 	p.print_usage  = lambda fd=sys.stdout : fd.write(USAGE)
 	p.format_help  = lambda : S3_USAGE
 	p.format_usage = lambda : S3_USAGE
-	
+
 	p.add_argument("-o", "--openstack", dest="rc",
 		action="store_const", const="~/.ec2-novarc", default="~/.ec2-novarc")
 	p.add_argument("-e", "--eucalyptus", dest="rc",
 		action="store_const", const="~/.ec2-eucarc")
+
+	s = p.add_subparsers(dest="cmd")
 
 	args = p.parse_args()
 	return args
@@ -107,10 +109,22 @@ def _cxn_from_env():
 
 	return cxn
 
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#
+# Sub Commands
+#
+
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#
+# Main
+#
+
 if __name__ == "__main__":
 
 	args = _argparse()
-	
+
 	if args.rc:
 		_source_env(args.rc)
 
