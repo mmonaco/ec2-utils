@@ -42,6 +42,9 @@ usage: main [-h|--help] [options] <command> [<args>]
   ec2 lsimg
       List images.
 
+  ec2 kill <instance> [<instance>...]
+      Terminate instances.
+
   ec2 keys
       List keypairs.
 
@@ -86,6 +89,9 @@ def _argparse():
 	p_run.add_argument("-u", "--user_data", type=str, default=None)
 	p_run.add_argument("-g", "--groups", type=str, default=None)
 	p_run.add_argument("environ", nargs="*", type=str)
+
+	p_kill = s.add_parser("kill")
+	p_kill.add_argument("instance_ids", nargs="+")
 
 	p_ls = s.add_parser("ls")
 	p_ls.add_argument("instance_ids", nargs="*", type=str)
@@ -198,7 +204,7 @@ def _get_user_data(user_data, environ=tuple()):
 			user_data = t.read()
 			t.close()
 			n.close()
-		
+
 		elif os.path.isfile(user_data):
 
 			f = open(user_data, "r")
@@ -206,6 +212,15 @@ def _get_user_data(user_data, environ=tuple()):
 			f.close()
 
 	return user_data
+
+
+def _get_instance_from_id(cxn, instance_id):
+
+	res_lst = cxn.get_all_instances([instance_id])
+	assert len(res_lst) == 1
+	ins_lst = res_lst[0].instances
+	assert len(ins_lst) == 1
+	return ins_lst[0]
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -274,6 +289,12 @@ def ec2_ls_images(cxn):
 	imgs = cxn.get_all_images()
 	for i in imgs:
 		ec2_ls_image(i)
+
+
+def ec2_terminate_instance(cxn, inst_id):
+
+	inst = _get_instance_from_id(cxn, inst_id)
+	inst.terminate()
 
 
 def ec2_ls_keys(cxn):
@@ -347,6 +368,10 @@ if __name__ == "__main__":
 			args.groups = args.groups.split(",")
 		ec2_run_instance(cxn, args.imageid, args.num_instances, args.key,
 			args.user_data, args.groups, args.environ)
+
+	elif args.cmd == "kill":
+		for i in args.instance_ids:
+			ec2_terminate_instance(cxn, i)
 
 	elif args.cmd == "lsimg":
 		ec2_ls_images(cxn)
