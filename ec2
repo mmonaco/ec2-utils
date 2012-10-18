@@ -48,6 +48,9 @@ usage: main [-h|--help] [options] <command> [<args>]
   ec2 cat <instance>
       Display console output from instance.
 
+  ec2 ud-cat <instance>
+      Display user data from instance.
+
   ec2 keys
       List keypairs.
 
@@ -98,6 +101,9 @@ def _argparse():
 
 	p_cat = s.add_parser("cat")
 	p_cat.add_argument("instance_id")
+
+	parser_udcat = s.add_parser("ud-cat")
+	parser_udcat.add_argument("instance_id")
 
 	p_ls = s.add_parser("ls")
 	p_ls.add_argument("instance_ids", nargs="*", type=str)
@@ -310,6 +316,14 @@ def ec2_cat_instance(cxn, instance_id):
 	print(c.output)
 
 
+def ec2_cat_instance_userdata(cxn, instance_id):
+
+	#TODO
+	i = _get_instance_from_id(cxn, instance_id)
+	c = i.get_attribute("userData")
+	print(c)
+
+
 def ec2_ls_keys(cxn):
 
 	keys = cxn.get_all_key_pairs()
@@ -388,6 +402,9 @@ if __name__ == "__main__":
 
 	elif args.cmd == "cat":
 		ec2_cat_instance(cxn, args.instance_id)
+
+	elif args.cmd == "ud-cat":
+		ec2_cat_instance_userdata(cxn, args.instance_id)
 
 	elif args.cmd == "lsimg":
 		ec2_ls_images(cxn)
