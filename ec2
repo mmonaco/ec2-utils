@@ -45,6 +45,9 @@ usage: main [-h|--help] [options] <command> [<args>]
   ec2 kill <instance> [<instance>...]
       Terminate instances.
 
+  ec2 cat <instance>
+      Display console output from instance.
+
   ec2 keys
       List keypairs.
 
@@ -92,6 +95,9 @@ def _argparse():
 
 	p_kill = s.add_parser("kill")
 	p_kill.add_argument("instance_ids", nargs="+")
+
+	p_cat = s.add_parser("cat")
+	p_cat.add_argument("instance_id")
 
 	p_ls = s.add_parser("ls")
 	p_ls.add_argument("instance_ids", nargs="*", type=str)
@@ -297,6 +303,13 @@ def ec2_terminate_instance(cxn, inst_id):
 	inst.terminate()
 
 
+def ec2_cat_instance(cxn, instance_id):
+
+	i = _get_instance_from_id(cxn, instance_id)
+	c = i.get_console_output()
+	print(c.output)
+
+
 def ec2_ls_keys(cxn):
 
 	keys = cxn.get_all_key_pairs()
@@ -372,6 +385,9 @@ if __name__ == "__main__":
 	elif args.cmd == "kill":
 		for i in args.instance_ids:
 			ec2_terminate_instance(cxn, i)
+
+	elif args.cmd == "cat":
+		ec2_cat_instance(cxn, args.instance_id)
 
 	elif args.cmd == "lsimg":
 		ec2_ls_images(cxn)
