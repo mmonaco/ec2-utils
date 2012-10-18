@@ -25,6 +25,10 @@ USAGE = """\
 usage: main [-h|--help] [options] <command> [<args>]
 
   An EC2 tool
+  
+  ec2 ls [-d] [<instance-id>...]
+      List all instances.
+      -d  Dump information in a line-separated format.
 
   options:
     -h, --help         print this message and exit
@@ -48,6 +52,10 @@ def _argparse():
 		action="store_const", const="~/.ec2-eucarc")
 
 	s = p.add_subparsers(dest="cmd")
+	
+	p_ls = s.add_parser("ls")
+	p_ls.add_argument("instance_ids", nargs="*", type=str)
+	p_ls.add_argument("-d", "--dump", action="store_true")
 
 	args = p.parse_args()
 	return args
@@ -115,6 +123,41 @@ def _cxn_from_env():
 # Sub Commands
 #
 
+def ec2_ls_instance(r, i, dump=False):
+
+	pubname = i.public_dns_name if i.public_dns_name else i.ip_address
+	priname = i.private_dns_name if i.private_dns_name else i.private_ip_address
+
+	if dump:
+		keys = sorted(i.__dict__.keys())
+		for k in keys:
+			print("%-20s = %s" % (k, i.__dict__[k]))
+		print("")
+	else:
+		print("%s %s [%-7s] %-15s %-15s %s   %s" % (
+			r.id, i.id, i.state, pubname, priname, i.image_id, i.key_name))
+
+
+def ec2_ls_instances(cxn, instance_ids, dump=False):
+
+	reservations = cxn.get_all_instances(instance_ids=instance_ids)
+	lst = []
+	for r in reservations:
+		for i in r.instances:
+			i._resrv_ = r
+		lst.extend(r.instances)
+
+	lst.sort(key=lambda x: x.id)
+
+	for i in lst:
+		ec2_ls_instance(i._resrv_, i, dump)
+
+def ec2_ls_image(i):
+
+	print("%s %s [%s] %s %12s %12s %s" % (
+		i.id, i.owner_id, i.state, i.root_device_name, i.kernel_id,
+		i.ramdisk_id, i.location))
+
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
@@ -129,3 +172,6 @@ if __name__ == "__main__":
 		_source_env(args.rc)
 
 	cxn = _cxn_from_env()
+
+	if args.cmd == "ls":
+		ec2_ls_instances(cxn, args.instance_ids, args.dump)
