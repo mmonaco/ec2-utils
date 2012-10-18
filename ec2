@@ -1,0 +1,87 @@
+#!/usr/bin/env python2
+
+# This file is part of ec2-utils.
+#
+# Copyright 2012 Matthew Monaco
+#
+# ec2-utils is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# ec2-utils is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with ec2-utils.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import print_function
+import os, re, sys, argparse, subprocess
+import boto, boto.ec2.connection, boto.ec2.regioninfo
+
+USAGE = """\
+usage: main [-h|--help] [options] <command> [<args>]
+
+  An EC2 tool
+
+  options:
+    -h, --help         print this message and exit
+
+"""
+
+def _argparse():
+
+	p = argparse.ArgumentParser()
+
+	p.print_help   = lambda fd=sys.stdout : fd.write(USAGE)
+	p.print_usage  = lambda fd=sys.stdout : fd.write(USAGE)
+	p.format_help  = lambda : S3_USAGE
+	p.format_usage = lambda : S3_USAGE
+
+	args = p.parse_args()
+	return args
+
+
+def _parse_url(url):
+
+	m = re.match("http://(.+):(\d+)(/.+)?", url)
+
+	if m and m.lastindex >= 2:
+		host = m.group(1)
+		port = int(m.group(2))
+		path = m.group(3) if m.group(3) else "/"
+	else:
+		raise Exception("parse_url: bad input '%s'" % url)
+
+	return host, port, path
+
+
+def _cxn_from_env():
+
+	ec2_access = os.getenv("EC2_ACCESS_KEY")
+	ec2_secret = os.getenv("EC2_SECRET_KEY")
+	ec2_url    = os.getenv("EC2_URL")
+
+	ec2_host, ec2_port, ec2_path = _parse_url(ec2_url)
+
+	region = boto.ec2.regioninfo.RegionInfo()
+	region.endpoint = ec2_host
+
+	cxn = boto.ec2.connection.EC2Connection(
+		aws_access_key_id=ec2_access,
+		aws_secret_access_key=ec2_secret,
+		port=ec2_port,
+		path=ec2_path,
+		is_secure=False,
+		region=region
+		)
+
+	return cxn
+
+if __name__ == "__main__":
+
+	args = _argparse()
+
+	cxn = _cxn_from_env()
