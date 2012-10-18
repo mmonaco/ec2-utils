@@ -32,9 +32,20 @@ usage: main [-h|--help] [options] <command> [<args>]
 
   ec2 lsimg
       List images.
-  
+
   ec2 keys
       List keypairs.
+
+  ec2 sg [-d] [<group>...]
+      List security groups
+      -d Dump multi-line information.
+
+  ec2 mksg <name> <description>
+      Create a new security group.
+
+  ec2 chsg [-d] <name> <proto> <srcport> [<dstport>]
+      Add a rule to security group
+      -d Delete rule
 
   options:
     -h, --help         print this message and exit
@@ -62,10 +73,25 @@ def _argparse():
 	p_ls = s.add_parser("ls")
 	p_ls.add_argument("instance_ids", nargs="*", type=str)
 	p_ls.add_argument("-d", "--dump", action="store_true")
-	
+
 	p_lsimg = s.add_parser("lsimg")
 
 	p_keys = s.add_parser("keys")
+
+	p_sg = s.add_parser("sg")
+	p_sg.add_argument("names", nargs="*", type=str)
+	p_sg.add_argument("-d", "--dump", action="store_true")
+
+	p_mksg = s.add_parser("mksg")
+	p_mksg.add_argument("name")
+	p_mksg.add_argument("desc")
+
+	p_chsg = s.add_parser("chsg")
+	p_chsg.add_argument("name", type=str)
+	p_chsg.add_argument("proto", type=str, choices=("tcp", "udp", "icmp"))
+	p_chsg.add_argument("srcport", type=int)
+	p_chsg.add_argument("dstport", type=int, nargs="?", default=None)
+	p_chsg.add_argument("-d", "--delete", action="store_true")
 
 	args = p.parse_args()
 	return args
@@ -126,6 +152,15 @@ def _cxn_from_env():
 		)
 
 	return cxn
+
+
+def _str_sg_rule(r):
+
+	s  = str(r.ip_protocol)
+	s += ":" + str(r.from_port)
+	if r.from_port != r.to_port:
+		s += ":" + str(r.to_port)
+	return s
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -191,6 +226,43 @@ def ec2_ls_keys(cxn):
 	for k in keys:
 		print("%s  %s" % (k.name, k.fingerprint))
 
+
+def ec2_ls_security_groups(cxn, names=None, dump=False):
+
+	lst = cxn.get_all_security_groups(groupnames=names)
+	for cg in lst:
+		if dump:
+			keys = sorted(cg.__dict__.keys())
+			for k in keys:
+				print("%-20s = %s" % (k, cg.__dict__[k]))
+			print("")
+		else:
+			print("%-15s" % (cg.name), end="")
+			for r in cg.rules:
+				print(" %s" % _str_sg_rule(r), end="")
+			print()
+
+
+def ec2_create_security_group(cxn, name, desc):
+
+	kp = cxn.create_security_group(name, desc)
+	print("created new sg %s - %s" % (kp, kp.name))
+
+
+def ec2_edit_security_group(cxn, name, proto, srcport, dstport=None, rm=False):
+
+	if not dstport:
+		dstport=srcport
+
+	cg = cxn.get_all_security_groups(groupnames=[name])
+	assert len(cg) == 1
+	cg = cg[0]
+	if rm:
+		cg.revoke(proto, srcport, dstport)
+	else:
+		cg.authorize(proto, srcport, dstport)
+
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
 # Main
@@ -207,10 +279,19 @@ if __name__ == "__main__":
 
 	if args.cmd == "ls":
 		ec2_ls_instances(cxn, args.instance_ids, args.dump)
-	
+
 	elif args.cmd == "lsimg":
 		ec2_ls_images(cxn)
-	
+
 	elif args.cmd == "keys":
 		ec2_ls_keys(cxn)
-	
+
+	elif args.cmd == "sg":
+		ec2_ls_security_groups(cxn, args.names, args.dump)
+
+	elif args.cmd == "mksg":
+		ec2_create_security_group(cxn, args.name, args.desc)
+
+	elif args.cmd == "chsg":
+		ec2_edit_security_group(cxn, args.name, args.proto, args.srcport,
+			args.dstport, args.delete)
