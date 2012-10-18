@@ -332,6 +332,11 @@ if __name__ == "__main__":
 	if args.rc:
 		_source_env(args.rc)
 
+	if hasattr(args, "key") and not args.key:
+		if "EC2_DEFAULT_KEY" in os.environ:
+			args.key = os.environ["EC2_DEFAULT_KEY"]
+			print("Using '%s' as default key" % args.key, file=sys.stderr)
+
 	cxn = _cxn_from_env()
 
 	if args.cmd == "ls":
