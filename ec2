@@ -32,6 +32,9 @@ usage: main [-h|--help] [options] <command> [<args>]
 
   ec2 lsimg
       List images.
+  
+  ec2 keys
+      List keypairs.
 
   options:
     -h, --help         print this message and exit
@@ -61,6 +64,8 @@ def _argparse():
 	p_ls.add_argument("-d", "--dump", action="store_true")
 	
 	p_lsimg = s.add_parser("lsimg")
+
+	p_keys = s.add_parser("keys")
 
 	args = p.parse_args()
 	return args
@@ -180,6 +185,12 @@ def ec2_ls_images(cxn):
 		ec2_ls_image(i)
 
 
+def ec2_ls_keys(cxn):
+
+	keys = cxn.get_all_key_pairs()
+	for k in keys:
+		print("%s  %s" % (k.name, k.fingerprint))
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
 # Main
@@ -199,3 +210,7 @@ if __name__ == "__main__":
 	
 	elif args.cmd == "lsimg":
 		ec2_ls_images(cxn)
+	
+	elif args.cmd == "keys":
+		ec2_ls_keys(cxn)
+	
