@@ -20,11 +20,20 @@
 from __future__ import print_function
 import os, re, sys, argparse, subprocess
 import boto, boto.ec2.connection, boto.ec2.regioninfo
+import tempfile, os.path
 
 USAGE = """\
 usage: main [-h|--help] [options] <command> [<args>]
 
   An EC2 tool
+
+  ec2 run [opts] <image-id> [<environment>...]
+      -k <key-name>  Registered key to place in /root/.ssh/authorized_keys
+      -n <num>       Number of instances to run, default 1
+      -u <file>      Filename to copy to user-data, this shows up at link-local
+                     http://169.254.169.255/latest/user-data. If the file is a
+                     directory, run makeself and use install.sh.
+      -g <grp[,grp...]> A list of security groups
 
   ec2 ls [-d] [<instance-id>...]
       List all instances.
@@ -69,6 +78,14 @@ def _argparse():
 		action="store_const", const="~/.ec2-eucarc")
 
 	s = p.add_subparsers(dest="cmd")
+
+	p_run = s.add_parser("run")
+	p_run.add_argument("imageid", type=str)
+	p_run.add_argument("-k", "--key", type=str, default=None)
+	p_run.add_argument("-n", "--num_instances", type=int, default=1)
+	p_run.add_argument("-u", "--user_data", type=str, default=None)
+	p_run.add_argument("-g", "--groups", type=str, default=None)
+	p_run.add_argument("environ", nargs="*", type=str)
 
 	p_ls = s.add_parser("ls")
 	p_ls.add_argument("instance_ids", nargs="*", type=str)
@@ -163,10 +180,49 @@ def _str_sg_rule(r):
 	return s
 
 
+def _get_user_data(user_data, environ=tuple()):
+
+	environ = tuple(environ)
+
+	if user_data:
+
+		if os.path.isdir(user_data):
+
+			n = open(os.devnull, "w")
+			t = tempfile.NamedTemporaryFile("r")
+			p = subprocess.call(
+				("makeself", "--current", user_data, t.name, user_data, "./bin/install.sh")
+				+ environ,
+				stdout=n, stderr=subprocess.STDOUT
+			)
+			user_data = t.read()
+			t.close()
+			n.close()
+		
+		elif os.path.isfile(user_data):
+
+			f = open(user_data, "r")
+			user_data = f.read()
+			f.close()
+
+	return user_data
+
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
 # Sub Commands
 #
+
+def ec2_run_instance(cxn, imageid, num_instances=1, key=None, user_data=None, groups=None, env=tuple()):
+
+	user_data = _get_user_data(user_data, env)
+	res = cxn.run_instances(imageid, key_name=key,
+		min_count=num_instances, max_count=num_instances,
+		user_data=user_data, security_groups=groups)
+	ec2_ls_instances(cxn, res.instances)
+
+	return res
+
 
 def ec2_ls_instance(r, i, dump=False):
 
@@ -263,6 +319,7 @@ def ec2_edit_security_group(cxn, name, proto, srcport, dstport=None, rm=False):
 		cg.authorize(proto, srcport, dstport)
 
 
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
 # Main
@@ -279,6 +336,12 @@ if __name__ == "__main__":
 
 	if args.cmd == "ls":
 		ec2_ls_instances(cxn, args.instance_ids, args.dump)
+
+	elif args.cmd == "run":
+		if args.groups:
+			args.groups = args.groups.split(",")
+		ec2_run_instance(cxn, args.imageid, args.num_instances, args.key,
+			args.user_data, args.groups, args.environ)
 
 	elif args.cmd == "lsimg":
 		ec2_ls_images(cxn)
