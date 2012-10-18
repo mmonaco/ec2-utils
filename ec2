@@ -25,10 +25,13 @@ USAGE = """\
 usage: main [-h|--help] [options] <command> [<args>]
 
   An EC2 tool
-  
+
   ec2 ls [-d] [<instance-id>...]
       List all instances.
       -d  Dump information in a line-separated format.
+
+  ec2 lsimg
+      List images.
 
   options:
     -h, --help         print this message and exit
@@ -52,10 +55,12 @@ def _argparse():
 		action="store_const", const="~/.ec2-eucarc")
 
 	s = p.add_subparsers(dest="cmd")
-	
+
 	p_ls = s.add_parser("ls")
 	p_ls.add_argument("instance_ids", nargs="*", type=str)
 	p_ls.add_argument("-d", "--dump", action="store_true")
+	
+	p_lsimg = s.add_parser("lsimg")
 
 	args = p.parse_args()
 	return args
@@ -152,11 +157,27 @@ def ec2_ls_instances(cxn, instance_ids, dump=False):
 	for i in lst:
 		ec2_ls_instance(i._resrv_, i, dump)
 
+
 def ec2_ls_image(i):
 
 	print("%s %s [%s] %s %12s %12s %s" % (
 		i.id, i.owner_id, i.state, i.root_device_name, i.kernel_id,
 		i.ramdisk_id, i.location))
+
+
+
+def ec2_ls_image(i):
+
+	print("%s %s [%s] %s %12s %12s %s" % (
+		i.id, i.owner_id, i.state, i.root_device_name, i.kernel_id,
+		i.ramdisk_id, i.location))
+
+
+def ec2_ls_images(cxn):
+
+	imgs = cxn.get_all_images()
+	for i in imgs:
+		ec2_ls_image(i)
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -175,3 +196,6 @@ if __name__ == "__main__":
 
 	if args.cmd == "ls":
 		ec2_ls_instances(cxn, args.instance_ids, args.dump)
+	
+	elif args.cmd == "lsimg":
+		ec2_ls_images(cxn)
