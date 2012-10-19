@@ -20,7 +20,7 @@
 from __future__ import print_function
 import os, re, sys, argparse, subprocess
 import boto, boto.ec2.connection, boto.ec2.regioninfo
-import tempfile, os.path
+import tempfile, os.path, time
 
 USAGE = """\
 usage: main [-h|--help] [options] <command> [<args>]
@@ -34,6 +34,11 @@ usage: main [-h|--help] [options] <command> [<args>]
                      http://169.254.169.255/latest/user-data. If the file is a
                      directory, run makeself and use install.sh.
       -g <grp[,grp...]> A list of security groups
+
+  ec2 ssh [-w] [-k] <instance-id>
+      Open an SSH session to <instance-id>
+      -w Wait for instance if public ip is not available
+      -k Terminate the session after exit
 
   ec2 ls [-d] [<instance-id>...]
       List all instances.
@@ -127,6 +132,11 @@ def _argparse():
 	p_chsg.add_argument("srcport", type=int)
 	p_chsg.add_argument("dstport", type=int, nargs="?", default=None)
 	p_chsg.add_argument("-d", "--delete", action="store_true")
+
+	p_ssh = s.add_parser("ssh")
+	p_ssh.add_argument("instanceid")
+	p_ssh.add_argument("-k", "--kill", action="store_true")
+	p_ssh.add_argument("-w", "--wait", action="store_true")
 
 	args = p.parse_args()
 	return args
@@ -233,6 +243,24 @@ def _get_instance_from_id(cxn, instance_id):
 	ins_lst = res_lst[0].instances
 	assert len(ins_lst) == 1
 	return ins_lst[0]
+
+
+def _wait_on_instance(i, wait=5, first=None):
+
+	if i.ip_address != i.private_ip_address:
+		return
+
+	if not first:
+		first=wait
+
+	print("Waiting on public IP for '%s'." % i.id, end=""); sys.stdout.flush()
+	time.sleep(first)
+
+	while i.ip_address == i.private_ip_address:
+		i.update()
+		print(".", end=""); sys.stdout.flush()
+		time.sleep(wait)
+	print("", i.ip_address)
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -367,6 +395,27 @@ def ec2_edit_security_group(cxn, name, proto, srcport, dstport=None, rm=False):
 		cg.authorize(proto, srcport, dstport)
 
 
+def ec2_ssh(cxn, instanceid, kill=False, wait=False):
+
+	i = _get_instance_from_id(cxn, instanceid)
+	if not i:
+		print("No instance with id '%s' found" % instanceid)
+		return
+
+	if not wait and i.ip_address == i.private_ip_address:
+		print("Instance does not yet have a public ip, private is '%s'" % i.private_ip_address)
+		return
+
+	if wait:
+		_wait_on_instance(i)
+
+	p = subprocess.Popen(("ssh", "-l", "root", str(i.ip_address)))
+	p.communicate()
+
+	if kill:
+		print("Terminating instance")
+		i.terminate()
+
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #
@@ -421,3 +470,6 @@ if __name__ == "__main__":
 	elif args.cmd == "chsg":
 		ec2_edit_security_group(cxn, args.name, args.proto, args.srcport,
 			args.dstport, args.delete)
+
+	elif args.cmd == "ssh":
+		ec2_ssh(cxn, args.instanceid, args.kill, args.wait)
