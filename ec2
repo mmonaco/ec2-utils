@@ -22,6 +22,8 @@ import os, re, sys, argparse, subprocess
 import boto, boto.ec2.connection, boto.ec2.regioninfo
 import tempfile, os.path, time
 
+VERSION="ec2-utils 1"
+
 USAGE = """\
 usage: main [-h|--help] [options] <command> [<args>]
 
@@ -74,6 +76,7 @@ usage: main [-h|--help] [options] <command> [<args>]
     -h, --help         print this message and exit
     -o, --openstack    source ~/.ec2-novarc (default)
     -e, --eucalyptus   source ~/.ec2-eucarc
+    --version          print the version number and exit
 
 """
 
@@ -90,6 +93,7 @@ def _argparse():
 		action="store_const", const="~/.ec2-novarc", default="~/.ec2-novarc")
 	p.add_argument("-e", "--eucalyptus", dest="rc",
 		action="store_const", const="~/.ec2-eucarc")
+	p.add_argument("--version", action="version", version=str(VERSION))
 
 	s = p.add_subparsers(dest="cmd")
 
