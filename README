@@ -18,6 +18,7 @@ TODO
 Add more commands
 Add an installer
 Handle python2 and python3
+Add --format option to print commands.
 
 
 LICENSE
