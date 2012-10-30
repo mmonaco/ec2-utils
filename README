@@ -11,6 +11,7 @@ DEPENDENCIES
 
 python2
 boto
+makeself - for running an instance with a dir as user-data
 
 
 TODO
