@@ -338,7 +338,11 @@ def ec2_ls_images(cxn):
 def ec2_terminate_instance(cxn, inst_id):
 
 	inst = _get_instance_from_id(cxn, inst_id)
-	inst.terminate()
+	try:
+		inst.terminate()
+	except AttributeError:
+		# The cause of this is currently unknown
+		pass
 
 
 def ec2_cat_instance(cxn, instance_id):
